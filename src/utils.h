@@ -12,6 +12,11 @@ typedef enum {
     MODE_MELODIA1,
     MODE_MELODIA2,
     MODE_LIBRE
-} mode_t;
+} pianoMode;
+
+typedef enum {
+    PLAYING,
+    STOP
+} playingState;
 
 double calculateDistance(double patt_trans1[3][4], double patt_trans2[3][4]);

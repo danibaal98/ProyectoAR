@@ -5,19 +5,20 @@
 #include <AR/ar.h>
 #include <AR/arMulti.h>
 #include <math.h>
-#include <vlc/vlc.h>
+#include <string.h>
+#include <sys/types.h>
+#include <signal.h>
+#include <unistd.h>
 
-#include "../include/utils.h"
+#include "utils.h"
 
 ARMultiMarkerInfoT *mMarker;
 TObject *objects = NULL;
-libvlc_instance_t *inst;
-libvlc_media_player_t *mp;
-libvlc_media_t *m;
 int nobjects = 0;
-mode_t mode = MODE_LIBRE;
-uint8_t isPlaying = 0;
+pianoMode mode = MODE_LIBRE;
 static double angle = 0;
+uint8_t isPlaying[5] = {0, 0, 0, 0, 0};
+pid_t processPlaying = -1;
 
 void print_error(char *error) { 
     printf("%s\n", error);
@@ -40,11 +41,11 @@ void addObject(char *p, double w, double c[2], void (*drawme)(void)) {
     nobjects++;
     objects = (TObject *)realloc(objects, sizeof(TObject) * nobjects);
 
-    objects[nobjects-1].id = pattid;
-    objects[nobjects-1].width = w;
-    objects[nobjects-1].center[0] = c[0];
-    objects[nobjects-1].center[1] = c[1];
-    objects[nobjects-1].drawme = drawme;
+    objects[nobjects - 1].id        = pattid;
+    objects[nobjects - 1].width     = w;
+    objects[nobjects - 1].center[0] = c[0];
+    objects[nobjects - 1].center[1] = c[1];
+    objects[nobjects - 1].drawme    = drawme;
 }
 
 static void keyboard(unsigned char key, int x, int y) {
@@ -58,7 +59,33 @@ static void keyboard(unsigned char key, int x, int y) {
 }
 
 void libreFunc(void) {
+    double gl_para[16];
+    GLfloat material[] = {1.0, 1.0, 1.0, 1.0};
+    for (int i = 0; i < mMarker->marker_num; i++) {
+        glPushMatrix();
+        argConvGlpara(mMarker->marker[i].trans, gl_para);
+        glMultMatrixd(gl_para);
+        int markersPlaying = 0;
+        if (mMarker->marker[i].visible < 0) {
+            material[0] = 1.0;
+            material[1] = 0.0;
+            material[2] = 0.0;
+            for (int j = 0; j < 5; j++) 
+                if (isPlaying[i] == 1) markersPlaying++;
+            if (markersPlaying == 0)
+                playSound(i);
+        } else {
+            material[0] = 0.0;
+            material[1] = 1.0;
+            material[2] = 0.0;
+            stopSound(i);
+        }
 
+        glMaterialfv(GL_FRONT, GL_AMBIENT, material);
+        glTranslatef(0.0, 0.0, 25.0);
+        glutSolidCube(50.0);
+        glPopMatrix();
+    }
 }
 
 void melodia1Func(void) {
@@ -73,20 +100,42 @@ void claveSolFunc(void) {
 
 }
 
-void playSound(int soundId) {
-    if (isPlaying == 0) {
-        m = libvlc_media_new_path(inst, "");
-        mp = libvlc_media_player_new_from_media(m);
-        libvlc_media_release(m);
-        libvlc_media_player_play(mp);
-        isPlaying = 1;
+void playSound(uint8_t id) {
+    char path[25];
+    switch (id) {
+        case 0:
+            sprintf(path, "media/nota_%s.wav", "do");
+            break;
+        case 1:
+            sprintf(path, "media/nota_%s.wav", "re");
+            break;
+        case 2:
+            sprintf(path, "media/nota_%s.wav", "mi");
+            break;
+        case 3:
+            sprintf(path, "media/nota_%s.wav", "fa");
+            break;
+        case 4:
+            sprintf(path, "media/nota_%s.wav", "sol");
+            break;
     }
+
+    isPlaying[id] = 1;
+    switch (processPlaying = fork()) {
+        case -1:
+            fprintf(stderr, "Error al crear el proceso hijo\n");
+            exit(1);
+        case 0:
+            if (execl("/usr/bin/aplay", "aplay", path, NULL) < 0) {
+                perror("Error al reproducir el sonido\n");
+            }
+    } 
 }
 
-void stopSound() {
-    if (isPlaying == 1) {
-        libvlc_media_player_stop(mp);
-        isPlaying = 0;
+void stopSound(uint8_t id) {
+    if (isPlaying[id] == 1) {
+        kill(processPlaying, SIGKILL);
+        isPlaying[id] = 0;
     } 
 }
 
@@ -104,13 +153,13 @@ static void draw(void) {
 
     argConvGlpara(mMarker->trans, gl_para);
     glMatrixMode(GL_MODELVIEW);
-    glLoadMatrix(gl_para);
+    glLoadMatrixd(gl_para);
 
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
     glLightfv(GL_LIGHT0, GL_POSITION, light_position);
 
-    if (calculateDistance(objects[0].patt_trans, objects[3].patt_trans) < 90.0)
+    if (calculateDistance(objects[0].patt_trans, objects[3].patt_trans) < 95.0)
         mode = MODE_LIBRE;
     if (calculateDistance(objects[1].patt_trans, objects[3].patt_trans) < 90.0)
         mode = MODE_MELODIA1;
@@ -124,32 +173,16 @@ static void draw(void) {
     ux = objects[3].patt_trans[0][0];
     angle = (acos(ux / u_mod)) * (180.0 / M_PI);
 
-    if (mode == MODE_LIBRE) {
-        for (i = 0; i < mMarker->marker_num; i++) {
-            glPushMatrix();
-            argConvGlpara(mMarker->marker[i].trans, gl_para);
-            glMultMatrixd(gl_para);
-
-            if (mMarker->marker[i].visible < 0) {
-                material[0] = 1.0;
-                material[1] = 0.0;
-                material[2] = 0.0;
-                playSound(i);
-            } else {
-                material[0] = 0.0;
-                material[1] = 1.0;
-                material[2] = 0.0;
-                stopSound();
-            }
-            glMaterialfv(GL_FRONT, GL_AMBIENT, material);
-            glTranslatef(0.0, 0.0, 25.0);
-            glutSolidCube(50.0);
-            glPopMatrix();
-        }
-    } else if (mode == MODE_MELODIA1) {
-
-    } else if (mode == MODE_MELODIA2) {
-
+    switch (mode) {
+        case MODE_LIBRE:
+            objects[0].drawme();
+            break;
+        case MODE_MELODIA1:
+            objects[1].drawme();
+            break;
+        case MODE_MELODIA2:
+            objects[2].drawme();
+            break;
     }
         
     glDisable(GL_DEPTH_TEST);
@@ -160,7 +193,7 @@ static void init(void) {
     int xsize, ysize;
     double center[2] = {0.0, 0.0};
 
-    if (arVideoOpen("-dev=/dev/video2") < 0) exit(0);
+    if (arVideoOpen("-dev=/dev/video0") < 0) exit(0);
     if (arVideoInqSize(&xsize, &ysize) < 0)  exit(0);
 
     if (arParamLoad("data/camera_para.dat", 1, &wparam) < 0)
@@ -181,16 +214,12 @@ static void init(void) {
 
 }
 
-static void initVLC(void) {
-    inst = libvlc_new(0, NULL);
-}
-
 static void mainLoop(void) {
     ARUint8 *dataPtr;
     ARMarkerInfo *marker_info;
     int marker_num, i, j, k;
 
-    if ((dataPtr = (ARUint8)arVideoGetImage()) == NULL) {
+    if ((dataPtr = (ARUint8 *)arVideoGetImage()) == NULL) {
         arUtilSleep(2);
         return;
     }
@@ -232,7 +261,7 @@ static void mainLoop(void) {
 int main(int argc, char *argv) {
     glutInit(&argc, argv);
     init();
-    initVLC();
+
     arVideoCapStart();
     argMainLoop(NULL, keyboard, mainLoop);
     return 0;
