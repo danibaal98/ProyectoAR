@@ -89,6 +89,39 @@ void libreFunc(void) {
 }
 
 void melodia1Func(void) {
+    double gl_para[16];
+    GLfloat material[] = {1.0, 1.0, 1.0};
+    int melodia[] = {0, 0, 1, 0, 3, 2, 0, 0, 1, 0, 4, 3};
+    int i;
+
+    for (i = 0; i < 12; i++) {
+        glPushMatrix();
+        argConvGlpara(mMarker->marker[melodia[i]].trans, gl_para);
+        glMultMatrixd(gl_para);
+        if (mMarker->marker[melodia[i]].visible >= 0) {
+            material[0] = 1.0;
+            material[1] = 0.0;
+            material[2] = 0.0;
+            playSound(melodia[i]);
+
+            if (melodia[i] == 0 || melodia[i] == 1 || melodia[i] == 6 || melodia[i] == 7)
+                arUtilSleep(100);
+            else if (melodia[i] == 2 || melodia[i] == 3 || melodia[i] == 4 || melodia[i] == 8 || melodia[i] == 9 || melodia[i] == 10) 
+                arUtilSleep(200);
+            else if (melodia[i] == 5 || melodia[i] == 11)
+                arUtilSleep(400);
+            
+            stopSound(melodia[i]);
+        }
+        glMaterialfv(GL_FRONT, GL_AMBIENT, material);
+        glTranslatef(0.0, 0.0, 25.0);
+        glutSolidCube(50.0);
+        glPopMatrix();
+    }
+
+    for (i = 0; i < mMarker->marker_num; i++) {
+        
+    }
 
 }
 
