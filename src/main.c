@@ -91,8 +91,8 @@ void libreFunc(void) {
 void melodia1Func(void) {
     double gl_para[16];
     GLfloat material[] = {1.0, 1.0, 1.0};
-    int melodia[] = {0, 0, 1, 0, 3, 2, 0, 0, 1, 0, 4, 3};
-    int i;
+    uint8_t melodia[] = {0, 0, 1, 0, 3, 2, 0, 0, 1, 0, 4, 3};
+    uint8_t i;
 
     for (i = 0; i < 12; i++) {
         glPushMatrix();
@@ -105,11 +105,15 @@ void melodia1Func(void) {
             playSound(melodia[i]);
 
             if (melodia[i] == 0 || melodia[i] == 1 || melodia[i] == 6 || melodia[i] == 7)
-                arUtilSleep(100);
+                arUtilSleep(500);
+                //sleep(1);
             else if (melodia[i] == 2 || melodia[i] == 3 || melodia[i] == 4 || melodia[i] == 8 || melodia[i] == 9 || melodia[i] == 10) 
-                arUtilSleep(200);
+                arUtilSleep(1000);
+                //sleep(2);
             else if (melodia[i] == 5 || melodia[i] == 11)
-                arUtilSleep(400);
+                arUtilSleep(2000);
+                
+                //sleep(4);
             
             stopSound(melodia[i]);
         }
@@ -119,9 +123,9 @@ void melodia1Func(void) {
         glPopMatrix();
     }
 
-    for (i = 0; i < mMarker->marker_num; i++) {
+    // for (i = 0; i < mMarker->marker_num; i++) {
         
-    }
+    // }
 
 }
 
@@ -194,9 +198,9 @@ static void draw(void) {
 
     if (calculateDistance(objects[0].patt_trans, objects[3].patt_trans) < 95.0)
         mode = MODE_LIBRE;
-    if (calculateDistance(objects[1].patt_trans, objects[3].patt_trans) < 90.0)
+    if (calculateDistance(objects[1].patt_trans, objects[3].patt_trans) < 95.0)
         mode = MODE_MELODIA1;
-    if (calculateDistance(objects[2].patt_trans, objects[3].patt_trans) < 90.0)
+    if (calculateDistance(objects[2].patt_trans, objects[3].patt_trans) < 95.0)
         mode = MODE_MELODIA2;
 
     u_mod = sqrt(pow(objects[3].patt_trans[0][0], 2)
@@ -226,7 +230,7 @@ static void init(void) {
     int xsize, ysize;
     double center[2] = {0.0, 0.0};
 
-    if (arVideoOpen("-dev=/dev/video0") < 0) exit(0);
+    if (arVideoOpen("-dev=/dev/video2") < 0) exit(0);
     if (arVideoInqSize(&xsize, &ysize) < 0)  exit(0);
 
     if (arParamLoad("data/camera_para.dat", 1, &wparam) < 0)
