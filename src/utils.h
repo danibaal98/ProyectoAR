@@ -19,4 +19,6 @@ typedef enum {
     STOP
 } playingState;
 
+#define MELODIA1_LENGTH 12
+
 double calculateDistance(double patt_trans1[3][4], double patt_trans2[3][4]);

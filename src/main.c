@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <signal.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "utils.h"
 
@@ -17,8 +18,11 @@ TObject *objects = NULL;
 int nobjects = 0;
 pianoMode mode = MODE_LIBRE;
 static double angle = 0;
-uint8_t isPlaying[5] = {0, 0, 0, 0, 0};
+uint8_t isPlaying[5] = {0, 0, 0, 0, 0}, isPlayingMelodia1 = 0, isPlayingMelodia2 = 0;;
+uint8_t melodia1Completed = 0, melodia2Completed = 0;
+uint8_t melodiaPosition = 0;
 pid_t processPlaying = -1;
+int p[2];
 
 void print_error(char *error) { 
     printf("%s\n", error);
@@ -93,40 +97,49 @@ void melodia1Func(void) {
     GLfloat material[] = {1.0, 1.0, 1.0};
     uint8_t melodia[] = {0, 0, 1, 0, 3, 2, 0, 0, 1, 0, 4, 3};
     uint8_t i;
+    char buf;
 
-    for (i = 0; i < 12; i++) {
+    if (melodia1Completed == 0) {
         glPushMatrix();
-        argConvGlpara(mMarker->marker[melodia[i]].trans, gl_para);
+        argConvGlpara(mMarker->marker[melodia[melodiaPosition]].trans, gl_para);
         glMultMatrixd(gl_para);
-        if (mMarker->marker[melodia[i]].visible >= 0) {
+        if (mMarker->marker[melodia[melodiaPosition]].visible >= 0 && isPlayingMelodia1 != 1) {
             material[0] = 1.0;
             material[1] = 0.0;
             material[2] = 0.0;
-            playSound(melodia[i]);
+
+            playSound(melodia[melodiaPosition]);
+            pipe(p);
+            isPlayingMelodia1 = 1;
 
             if (melodia[i] == 0 || melodia[i] == 1 || melodia[i] == 6 || melodia[i] == 7)
-                arUtilSleep(500);
-                //sleep(1);
+                waitSeconds(250, p[1]);
             else if (melodia[i] == 2 || melodia[i] == 3 || melodia[i] == 4 || melodia[i] == 8 || melodia[i] == 9 || melodia[i] == 10) 
-                arUtilSleep(1000);
-                //sleep(2);
+                waitSeconds(500, p[1]);
             else if (melodia[i] == 5 || melodia[i] == 11)
-                arUtilSleep(2000);
-                
-                //sleep(4);
-            
-            stopSound(melodia[i]);
+                waitSeconds(1000, p[1]);
         }
+
+        if (isPlayingMelodia1 == 1) {
+            if (read(p[0], &buf, 1) > 0) {
+                stopSound(melodia[melodiaPosition]);
+                isPlayingMelodia1 = 0;
+                close(p[0]);
+                close(p[1]);
+                melodiaPosition++;
+                material[0] = 0.0;
+                material[1] = 1.0;
+                material[2] = 0.0;
+            }
+        }
+        
         glMaterialfv(GL_FRONT, GL_AMBIENT, material);
         glTranslatef(0.0, 0.0, 25.0);
         glutSolidCube(50.0);
         glPopMatrix();
+    } else {
+
     }
-
-    // for (i = 0; i < mMarker->marker_num; i++) {
-        
-    // }
-
 }
 
 void melodia2Func(void) {
@@ -174,6 +187,23 @@ void stopSound(uint8_t id) {
         kill(processPlaying, SIGKILL);
         isPlaying[id] = 0;
     } 
+}
+
+void waitSeconds(long msec, int writePipe) {
+    pid_t pid;
+    int res;
+    switch (pid = fork()) {
+        case -1:
+            fprintf(stderr, "Error al crear el proceso de espera\n");
+            exit(1);
+        case 0:
+            struct timespec ts;
+            ts.tv_sec = msec / 1000;
+            ts.tv_nsec = (msec % 1000) * 1000000;
+            if (nanosleep(&ts, &ts) == 0) {
+                write(writePipe, 'o', 1);
+            }
+    }
 }
 
 static void draw(void) {
