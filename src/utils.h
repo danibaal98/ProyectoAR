@@ -5,13 +5,12 @@ typedef struct {
     double width;
     double center[2];
     double patt_trans[3][4];
-    void (* drawme)(void);
 } TObject;
 
 typedef enum {
-    MODE_MELODIA1,
-    MODE_MELODIA2,
-    MODE_LIBRE
+    MODE_GUITAR,
+    MODE_SYNTH,
+    MODE_WAVE
 } pianoMode;
 
 typedef enum {
@@ -21,4 +20,12 @@ typedef enum {
 
 #define MELODIA1_LENGTH 12
 
+/**
+ * @brief Fuction to calculate the distance between two marks
+ * 
+ * @param patt_trans1 Transformation matrix for the first mark
+ * @param patt_trans2 Transformation matirs for the second mark
+ * 
+ * @return double With the distance between them
+ */
 double calculateDistance(double patt_trans1[3][4], double patt_trans2[3][4]);

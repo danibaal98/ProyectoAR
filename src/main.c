@@ -16,19 +16,26 @@
 ARMultiMarkerInfoT *mMarker;
 TObject *objects = NULL;
 int nobjects = 0;
-pianoMode mode = MODE_LIBRE;
+pianoMode mode = MODE_GUITAR;
 static double angle = 0;
-uint8_t isPlaying[5] = {0, 0, 0, 0, 0}, isPlayingMelodia1 = 0, isPlayingMelodia2 = 0;;
-uint8_t melodia1Completed = 0, melodia2Completed = 0;
-uint8_t melodiaPosition = 0;
+uint8_t isPlaying[5] = {0, 0, 0, 0, 0};
 pid_t processPlaying = -1;
-int p[2];
+char *extension = ".wav";
+char *mediaFolder = "media/";
 
+/**
+ * @brief prints error messages
+ * 
+ * @param error Text message to be printed out
+ */
 void print_error(char *error) { 
     printf("%s\n", error);
     exit(0);
 }
 
+/**
+ * @brief free resources from the system
+ */
 void cleanup() {
     arVideoCapStop();
     arVideoClose();
@@ -36,7 +43,14 @@ void cleanup() {
     exit(0);
 }
 
-void addObject(char *p, double w, double c[2], void (*drawme)(void)) {
+/**
+ * @brief function to add an object
+ * 
+ * @param p route to the .patt file
+ * @param w width of the mark
+ * @param c array of the center of the marker
+ */
+void addObject(char *p, double w, double c[2]) {
     int pattid;
 
     if ((pattid = arLoadPatt(p)) < 0)
@@ -49,9 +63,11 @@ void addObject(char *p, double w, double c[2], void (*drawme)(void)) {
     objects[nobjects - 1].width     = w;
     objects[nobjects - 1].center[0] = c[0];
     objects[nobjects - 1].center[1] = c[1];
-    objects[nobjects - 1].drawme    = drawme;
 }
 
+/**
+ * @brief callback function to capture keyboard
+ */
 static void keyboard(unsigned char key, int x, int y) {
     switch (key) {
         case 0x1B:
@@ -62,115 +78,55 @@ static void keyboard(unsigned char key, int x, int y) {
     }
 }
 
-void libreFunc(void) {
-    double gl_para[16];
-    GLfloat material[] = {1.0, 1.0, 1.0, 1.0};
-    for (int i = 0; i < mMarker->marker_num; i++) {
-        glPushMatrix();
-        argConvGlpara(mMarker->marker[i].trans, gl_para);
-        glMultMatrixd(gl_para);
-        int markersPlaying = 0;
-        if (mMarker->marker[i].visible < 0) {
-            material[0] = 1.0;
-            material[1] = 0.0;
-            material[2] = 0.0;
-            for (int j = 0; j < 5; j++) 
-                if (isPlaying[i] == 1) markersPlaying++;
-            if (markersPlaying == 0)
-                playSound(i);
-        } else {
-            material[0] = 0.0;
-            material[1] = 1.0;
-            material[2] = 0.0;
-            stopSound(i);
-        }
-
-        glMaterialfv(GL_FRONT, GL_AMBIENT, material);
-        glTranslatef(0.0, 0.0, 25.0);
-        glutSolidCube(50.0);
-        glPopMatrix();
-    }
-}
-
-void melodia1Func(void) {
-    double gl_para[16];
-    GLfloat material[] = {1.0, 1.0, 1.0};
-    uint8_t melodia[] = {0, 0, 1, 0, 3, 2, 0, 0, 1, 0, 4, 3};
-    uint8_t i;
-    char buf;
-
-    if (melodia1Completed == 0) {
-        glPushMatrix();
-        argConvGlpara(mMarker->marker[melodia[melodiaPosition]].trans, gl_para);
-        glMultMatrixd(gl_para);
-        if (mMarker->marker[melodia[melodiaPosition]].visible >= 0 && isPlayingMelodia1 != 1) {
-            material[0] = 1.0;
-            material[1] = 0.0;
-            material[2] = 0.0;
-
-            playSound(melodia[melodiaPosition]);
-            pipe(p);
-            isPlayingMelodia1 = 1;
-
-            if (melodia[i] == 0 || melodia[i] == 1 || melodia[i] == 6 || melodia[i] == 7)
-                waitSeconds(250, p[1]);
-            else if (melodia[i] == 2 || melodia[i] == 3 || melodia[i] == 4 || melodia[i] == 8 || melodia[i] == 9 || melodia[i] == 10) 
-                waitSeconds(500, p[1]);
-            else if (melodia[i] == 5 || melodia[i] == 11)
-                waitSeconds(1000, p[1]);
-        }
-
-        if (isPlayingMelodia1 == 1) {
-            if (read(p[0], &buf, 1) > 0) {
-                stopSound(melodia[melodiaPosition]);
-                isPlayingMelodia1 = 0;
-                close(p[0]);
-                close(p[1]);
-                melodiaPosition++;
-                material[0] = 0.0;
-                material[1] = 1.0;
-                material[2] = 0.0;
-            }
-        }
-        
-        glMaterialfv(GL_FRONT, GL_AMBIENT, material);
-        glTranslatef(0.0, 0.0, 25.0);
-        glutSolidCube(50.0);
-        glPopMatrix();
-    } else {
-
-    }
-}
-
-void melodia2Func(void) {
-
-}
-
-void claveSolFunc(void) {
-
-}
-
+/**
+ * @brief function to play a sound
+ * 
+ * @param id identifier of the note to be played
+ */
 void playSound(uint8_t id) {
-    char path[25];
+    char path[20];
+    char note[5];
+    char playingMode[10];
+    uint8_t octave = 0;
     switch (id) {
         case 0:
-            sprintf(path, "media/nota_%s.wav", "do");
+            sprintf(note, "%s", "do");
             break;
         case 1:
-            sprintf(path, "media/nota_%s.wav", "re");
+            sprintf(note, "%s", "re");
             break;
         case 2:
-            sprintf(path, "media/nota_%s.wav", "mi");
+            sprintf(note, "%s", "mi");
             break;
         case 3:
-            sprintf(path, "media/nota_%s.wav", "fa");
+            sprintf(note, "%s", "fa");
             break;
         case 4:
-            sprintf(path, "media/nota_%s.wav", "sol");
+            sprintf(note, "%s", "sol");
             break;
     }
 
+    switch(mode) {
+        case MODE_GUITAR:
+            sprintf(playingMode, "%s_", "guitar");
+            break;
+        case MODE_WAVE:
+            sprintf(playingMode, "%s_", "wave");
+            break;
+        case MODE_SYNTH:
+            sprintf(playingMode, "%s_", "synth");
+            break;
+    }
+
+    if (angle >= 80.0 && angle < 170.0)
+        octave = 1;
+    else if (angle >= 170.0 && angle <= 180.0)
+        octave = 2;
+
+    sprintf(path, "%s%s%s%d%s", mediaFolder, playingMode, note, octave, extension);
+
     isPlaying[id] = 1;
+
     switch (processPlaying = fork()) {
         case -1:
             fprintf(stderr, "Error al crear el proceso hijo\n");
@@ -182,6 +138,11 @@ void playSound(uint8_t id) {
     } 
 }
 
+/**
+ * @brief function to stop a sound
+ * 
+ * @param id note to be stopped
+ */
 void stopSound(uint8_t id) {
     if (isPlaying[id] == 1) {
         kill(processPlaying, SIGKILL);
@@ -189,23 +150,9 @@ void stopSound(uint8_t id) {
     } 
 }
 
-void waitSeconds(long msec, int writePipe) {
-    pid_t pid;
-    int res;
-    switch (pid = fork()) {
-        case -1:
-            fprintf(stderr, "Error al crear el proceso de espera\n");
-            exit(1);
-        case 0:
-            struct timespec ts;
-            ts.tv_sec = msec / 1000;
-            ts.tv_nsec = (msec % 1000) * 1000000;
-            if (nanosleep(&ts, &ts) == 0) {
-                write(writePipe, 'o', 1);
-            }
-    }
-}
-
+/**
+ * @brief function to draw on the marks
+ */
 static void draw(void) {
     double gl_para[16];
     GLfloat material[] = {1.0, 1.0, 1.0, 1.0};
@@ -226,41 +173,61 @@ static void draw(void) {
     glEnable(GL_LIGHT0);
     glLightfv(GL_LIGHT0, GL_POSITION, light_position);
 
-    if (calculateDistance(objects[0].patt_trans, objects[3].patt_trans) < 95.0)
-        mode = MODE_LIBRE;
-    if (calculateDistance(objects[1].patt_trans, objects[3].patt_trans) < 95.0)
-        mode = MODE_MELODIA1;
-    if (calculateDistance(objects[2].patt_trans, objects[3].patt_trans) < 95.0)
-        mode = MODE_MELODIA2;
+    if (calculateDistance(objects[0].patt_trans, objects[3].patt_trans) < 98.0)
+        mode = MODE_GUITAR;
+    if (calculateDistance(objects[1].patt_trans, objects[3].patt_trans) < 98.0)
+        mode = MODE_WAVE;
+    if (calculateDistance(objects[2].patt_trans, objects[3].patt_trans) < 98.0)
+        mode = MODE_SYNTH;
 
     u_mod = sqrt(pow(objects[3].patt_trans[0][0], 2)
-               + pow(objects[3].patt_trans[0][0], 2)
-               + pow(objects[3].patt_trans[0][0], 2));
+               + pow(objects[3].patt_trans[1][0], 2)
+               + pow(objects[3].patt_trans[2][0], 2));
 
     ux = objects[3].patt_trans[0][0];
     angle = (acos(ux / u_mod)) * (180.0 / M_PI);
 
-    switch (mode) {
-        case MODE_LIBRE:
-            objects[0].drawme();
-            break;
-        case MODE_MELODIA1:
-            objects[1].drawme();
-            break;
-        case MODE_MELODIA2:
-            objects[2].drawme();
-            break;
+    printf("Angulo: %lf\n", angle);
+
+    for (int i = 0; i < mMarker->marker_num; i++) {
+        glPushMatrix();
+        argConvGlpara(mMarker->marker[i].trans, gl_para);
+        glMultMatrixd(gl_para);
+        int markersPlaying = 0;
+        if (mMarker->marker[i].visible < 0) {
+            material[0] = 1.0;
+            material[1] = 0.0;
+            material[2] = 0.0;
+            //playSound(i);
+            for (int j = 0; j < 5; j++) 
+                if (isPlaying[i] == 1) markersPlaying++;
+            if (markersPlaying == 0)
+                playSound(i);
+        } else {
+            material[0] = 0.0;
+            material[1] = 1.0;
+            material[2] = 0.0;
+            stopSound(i);
+        }
+
+        glMaterialfv(GL_FRONT, GL_AMBIENT, material);
+        glTranslatef(0.0, 0.0, 25.0);
+        glutSolidCube(50.0);
+        glPopMatrix();
     }
         
     glDisable(GL_DEPTH_TEST);
 }
 
+/**
+ * @brief function to load marker files, open video stream and camera parameters
+ */
 static void init(void) {
     ARParam wparam, cparam;
     int xsize, ysize;
     double center[2] = {0.0, 0.0};
 
-    if (arVideoOpen("-dev=/dev/video2") < 0) exit(0);
+    if (arVideoOpen("-dev=/dev/video0") < 0) exit(0);
     if (arVideoInqSize(&xsize, &ysize) < 0)  exit(0);
 
     if (arParamLoad("data/camera_para.dat", 1, &wparam) < 0)
@@ -272,15 +239,18 @@ static void init(void) {
     if ((mMarker = arMultiReadConfigFile("data/teclado.dat")) == NULL) 
         print_error("Error en fichero teclado.dat\n");
 
-    addObject("data/libre.patt", 80.0, center, libreFunc);
-    addObject("data/melodia_1.patt", 80.0, center, melodia1Func);
-    addObject("data/melodia_2.patt", 80.0, center, melodia2Func);
-    addObject("data/clave_sol.patt", 80.0, center, claveSolFunc);
+    addObject("data/libre.patt", 80.0, center);
+    addObject("data/melodia_1.patt", 80.0, center);
+    addObject("data/melodia_2.patt", 80.0, center);
+    addObject("data/clave_sol.patt", 80.0, center);
 
     argInit(&cparam, 1.0, 0, 0, 0, 0);
 
 }
 
+/**
+ * @brief main loop function of the program
+ */
 static void mainLoop(void) {
     ARUint8 *dataPtr;
     ARMarkerInfo *marker_info;
@@ -325,6 +295,13 @@ static void mainLoop(void) {
     argSwapBuffers();
 }
 
+/**
+ * @brief Entrypoint of the program
+ * 
+ * @param argc Argument count
+ * @param argv Argument vector
+ * @return int = 0 if everything was OK
+ */
 int main(int argc, char *argv) {
     glutInit(&argc, argv);
     init();
