@@ -5,7 +5,7 @@ LIB_DIR      := $(ARTOOLKITDIR)/lib
 DIREXE := exec/
 DIRSRC := src/
 DIROBJ := obj/
-CCLDL  := -lARgsub -lARvideo -lARMulti -lAR -lglut -lGL -lGLU -lglut -lm -lvlc
+CCLDL  := -lARgsub -lARvideo -lARMulti -lAR -lglut -lGL -lGLU -lglut -lm 
 CCFLG  := -Wall -I$(INC_DIR) -c
 CC     := gcc
 
